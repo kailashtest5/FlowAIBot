@@ -1,56 +1,159 @@
+"""
+Zoho Flow Docs Chatbot — powered by Zia SearchLabs (helpassistant API)
+------------------------------------------------------------------------
+Calls the Zia SearchLabs "helpassistant" endpoint for each user query and
+renders the response in a chat UI.
+
+Endpoint:
+    GET https://searchlabs.zoho.in/restapi/sitesearch/beta/{org_id}/helpassistant
+        ?q={query}&api_config_key={api_key}&is_agentic=true
+
+Run:
+    pip install streamlit requests
+    streamlit run zia_flow_chatbot.py
+
+NOTE: I don't have a sample response payload for this endpoint, so this
+app tries several common field names (answer/response/message, results/hits/
+sources) and falls back to showing the raw JSON if none match. Once you
+share a sample response, I can tighten the rendering to match it exactly.
+If the endpoint also requires an OAuth token header (Authorization:
+Zoho-oauthtoken ...), fill that in the sidebar too — it's sent only if
+provided.
+"""
+
+import json
+import requests
 import streamlit as st
-from openai import OpenAI
 
-# Show title and description.
-st.title("💬 Chatbot")
-st.write(
-    "This is a simple chatbot that uses OpenAI's GPT-3.5 model to generate responses. "
-    "To use this app, you need to provide an OpenAI API key, which you can get [here](https://platform.openai.com/account/api-keys). "
-    "You can also learn how to build this app step by step by [following our tutorial](https://docs.streamlit.io/develop/tutorials/llms/build-conversational-apps)."
+st.set_page_config(page_title="Zia Flow Docs Chatbot", page_icon="🤖", layout="wide")
+
+BASE_URL = "https://searchlabs.zoho.in/restapi/sitesearch/beta/60077360247/helpassistant"
+api_config_key = "MjgyNjAwMDAwMDAwMjA5NQ==";
+
+def call_helpassistant(query, org_id, api_config_key, oauth_token=None, is_agentic=True, timeout=30):
+    url = BASE_URL.format(org_id=org_id)
+    params = {
+        "q": query,
+        "api_config_key": api_config_key,
+        "is_agentic": str(is_agentic).lower(),
+    }
+    headers = {}
+    if oauth_token:
+        headers["Authorization"] = f"Zoho-oauthtoken {oauth_token}"
+
+    resp = requests.get(url, params=params, headers=headers, timeout=timeout)
+    resp.raise_for_status()
+    try:
+        return resp.json()
+    except ValueError:
+        return {"_raw_text": resp.text}
+
+
+def render_answer(data):
+    """Extract the display-friendly answer from the helpassistant API response.
+
+    Expected shape:
+        {
+          "response": {
+            "summary": "...",
+            "is_full_response": true,
+            "action": "helpassistant",
+            "total_no_of_results": 1,
+            "status": "success",
+            "chat_id": "..."
+          }
+        }
+    """
+    if not isinstance(data, dict) or "response" not in data:
+        return f"_(Unrecognized response shape)_\n```json\n{json.dumps(data, indent=2)}\n```"
+
+    resp = data["response"]
+    status = resp.get("status")
+
+    if status != "success":
+        return f"⚠️ Zia returned status `{status}`.\n```json\n{json.dumps(resp, indent=2)}\n```"
+
+    summary = resp.get("summary", "").strip()
+    if not summary:
+        return f"_(No summary in response)_\n```json\n{json.dumps(resp, indent=2)}\n```"
+
+    footer_bits = []
+    if not resp.get("is_full_response", True):
+        footer_bits.append("_partial response_")
+    total_results = resp.get("total_no_of_results")
+    if total_results is not None:
+        footer_bits.append(f"_{total_results} source(s)_")
+
+    text = summary
+    if footer_bits:
+        text += "\n\n" + " · ".join(footer_bits)
+
+    return text
+
+
+# ---------------- Sidebar: connection config ----------------
+st.sidebar.header("🔧 Zia SearchLabs config")
+org_id = st.sidebar.text_input("Org ID", help="Your Zoho org ID (path param in the URL)")
+api_config_key = st.sidebar.text_input("API config key", type="password")
+oauth_token = st.sidebar.text_input(
+    "OAuth token (optional)",
+    type="password",
+    help="Only needed if the endpoint requires Authorization: Zoho-oauthtoken header",
 )
+is_agentic = st.sidebar.checkbox("is_agentic", value=True)
+show_raw = st.sidebar.checkbox("Always show raw JSON response", value=False)
 
-# Ask user for their OpenAI API key via `st.text_input`.
-# Alternatively, you can store the API key in `./.streamlit/secrets.toml` and access it
-# via `st.secrets`, see https://docs.streamlit.io/develop/concepts/connections/secrets-management
-openai_api_key = st.text_input("OpenAI API Key", type="password")
-if not openai_api_key:
-    st.info("Please add your OpenAI API key to continue.", icon="🗝️")
-else:
+st.title("🤖 Zoho Flow Docs Chatbot (Zia SearchLabs)")
+st.caption("Queries are sent live to your org's helpassistant endpoint — no local index.")
 
-    # Create an OpenAI client.
-    client = OpenAI(api_key=openai_api_key)
+if not org_id or not api_config_key:
+    st.info("Enter your Org ID and API config key in the sidebar to start chatting.")
+    st.stop()
 
-    # Create a session state variable to store the chat messages. This ensures that the
-    # messages persist across reruns.
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
+# ---------------- Chat state ----------------
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
-    # Display the existing chat messages via `st.chat_message`.
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
 
-    # Create a chat input field to allow the user to enter a message. This will display
-    # automatically at the bottom of the page.
-    if prompt := st.chat_input("What is up?"):
+query = st.chat_input("Ask about a Zoho Flow service, trigger, or action...")
 
-        # Store and display the current prompt.
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.markdown(prompt)
+if query:
+    st.session_state.messages.append({"role": "user", "content": query})
+    with st.chat_message("user"):
+        st.markdown(query)
 
-        # Generate a response using the OpenAI API.
-        stream = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": m["role"], "content": m["content"]}
-                for m in st.session_state.messages
-            ],
-            stream=True,
-        )
+    with st.chat_message("assistant"):
+        with st.spinner("Querying Zia..."):
+            try:
+                data = call_helpassistant(
+                    query=query,
+                    org_id=org_id,
+                    api_config_key=api_config_key,
+                    oauth_token=oauth_token or None,
+                    is_agentic=is_agentic,
+                )
+                answer = render_answer(data)
+                chat_id = data.get("response", {}).get("chat_id")
+                if chat_id:
+                    st.session_state.last_chat_id = chat_id
+                if show_raw:
+                    answer += f"\n\n<details><summary>Raw response</summary>\n\n```json\n{json.dumps(data, indent=2)}\n```\n\n</details>"
+            except requests.exceptions.HTTPError as e:
+                answer = f"⚠️ Request failed: `{e.response.status_code}` — {e.response.text[:500]}"
+            except requests.exceptions.RequestException as e:
+                answer = f"⚠️ Request error: {e}"
 
-        # Stream the response to the chat using `st.write_stream`, then store it in 
-        # session state.
-        with st.chat_message("assistant"):
-            response = st.write_stream(stream)
-        st.session_state.messages.append({"role": "assistant", "content": response})
+        st.markdown(answer, unsafe_allow_html=True)
+
+    st.session_state.messages.append({"role": "assistant", "content": answer})
+
+if st.session_state.get("last_chat_id"):
+    st.sidebar.caption(f"Last chat_id: `{st.session_state.last_chat_id}`")
+
+if st.sidebar.button("Clear chat"):
+    st.session_state.messages = []
+    st.session_state.last_chat_id = None
+    st.rerun()
