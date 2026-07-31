@@ -27,8 +27,8 @@ import streamlit as st
 
 st.set_page_config(page_title="Zia Flow Docs Chatbot", page_icon="🤖", layout="wide")
 
-BASE_URL = "https://searchlabs.zoho.in/restapi/sitesearch/beta/60077360247/helpassistant"
-api_config_key = "MjgyNjAwMDAwMDAwMjA5NQ==";
+BASE_URL = "https://searchlabs.zoho.in/restapi/sitesearch/beta/{org_id}/helpassistant"
+
 
 def call_helpassistant(query, org_id, api_config_key, oauth_token=None, is_agentic=True, timeout=30):
     url = BASE_URL.format(org_id=org_id)
@@ -37,7 +37,10 @@ def call_helpassistant(query, org_id, api_config_key, oauth_token=None, is_agent
         "api_config_key": api_config_key,
         "is_agentic": str(is_agentic).lower(),
     }
-    headers = {}
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+        "Accept": "application/json",
+    }
     if oauth_token:
         headers["Authorization"] = f"Zoho-oauthtoken {oauth_token}"
 
