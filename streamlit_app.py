@@ -16,9 +16,6 @@ NOTE: I don't have a sample response payload for this endpoint, so this
 app tries several common field names (answer/response/message, results/hits/
 sources) and falls back to showing the raw JSON if none match. Once you
 share a sample response, I can tighten the rendering to match it exactly.
-If the endpoint also requires an OAuth token header (Authorization:
-Zoho-oauthtoken ...), fill that in the sidebar too — it's sent only if
-provided.
 """
 
 import os
@@ -45,7 +42,7 @@ st.set_page_config(page_title="Zia Flow Docs Chatbot", page_icon="🤖", layout=
 BASE_URL = "https://searchlabs.zoho.in/restapi/sitesearch/beta/{org_id}/helpassistant"
 
 
-def call_helpassistant(query, org_id, api_config_key, oauth_token=None, is_agentic=True, timeout=30):
+def call_helpassistant(query, org_id, api_config_key, is_agentic=True, timeout=30):
     url = BASE_URL.format(org_id=org_id)
     params = {
         "q": query,
@@ -56,8 +53,6 @@ def call_helpassistant(query, org_id, api_config_key, oauth_token=None, is_agent
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
         "Accept": "application/json",
     }
-    if oauth_token:
-        headers["Authorization"] = f"Zoho-oauthtoken {oauth_token}"
 
     resp = requests.get(url, params=params, headers=headers, proxies=get_proxies(), timeout=timeout)
     resp.raise_for_status()
@@ -109,23 +104,17 @@ def render_answer(data):
     return text
 
 
-# ---------------- Sidebar: connection config ----------------
-st.sidebar.header("🔧 Zia SearchLabs config")
+# ---------------- Config (hardcoded, no sidebar) ----------------
 org_id = ORG_ID
 api_config_key = API_CONFIG_KEY
-oauth_token = st.sidebar.text_input(
-    "OAuth token (optional)",
-    type="password",
-    help="Only needed if the endpoint requires Authorization: Zoho-oauthtoken header",
-)
-is_agentic = st.sidebar.checkbox("is_agentic", value=True)
-show_raw = st.sidebar.checkbox("Always show raw JSON response", value=False)
+is_agentic = True
+show_raw = False
 
 st.title("🤖 Zoho Flow Docs Chatbot (Zia SearchLabs)")
 st.caption("Queries are sent live to your org's helpassistant endpoint — no local index.")
 
 if not org_id or not api_config_key:
-    st.info("Enter your Org ID and API config key in the sidebar to start chatting.")
+    st.info("Org ID and API config key are not set.")
     st.stop()
 
 # ---------------- Chat state ----------------
@@ -150,7 +139,6 @@ if query:
                     query=query,
                     org_id=org_id,
                     api_config_key=api_config_key,
-                    oauth_token=oauth_token or None,
                     is_agentic=is_agentic,
                 )
                 answer = render_answer(data)
@@ -169,9 +157,9 @@ if query:
     st.session_state.messages.append({"role": "assistant", "content": answer})
 
 if st.session_state.get("last_chat_id"):
-    st.sidebar.caption(f"Last chat_id: `{st.session_state.last_chat_id}`")
+    st.caption(f"Last chat_id: `{st.session_state.last_chat_id}`")
 
-if st.sidebar.button("Clear chat"):
+if st.button("Clear chat"):
     st.session_state.messages = []
     st.session_state.last_chat_id = None
     st.rerun()
