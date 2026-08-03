@@ -110,6 +110,16 @@ def render_answer(data):
 
 
 # ---------------- Sidebar: connection config ----------------
+st.sidebar.header("🔧 Zia SearchLabs config")
+org_id = ORG_ID
+api_config_key = API_CONFIG_KEY
+oauth_token = st.sidebar.text_input(
+    "OAuth token (optional)",
+    type="password",
+    help="Only needed if the endpoint requires Authorization: Zoho-oauthtoken header",
+)
+is_agentic = st.sidebar.checkbox("is_agentic", value=True)
+show_raw = st.sidebar.checkbox("Always show raw JSON response", value=False)
 
 st.title("🤖 Zoho Flow Docs Chatbot (Zia SearchLabs)")
 st.caption("Queries are sent live to your org's helpassistant endpoint — no local index.")
