@@ -21,9 +21,24 @@ Zoho-oauthtoken ...), fill that in the sidebar too — it's sent only if
 provided.
 """
 
+import os
 import json
 import requests
 import streamlit as st
+
+LOCAL_PROXY = "http://127.0.0.1:3128"
+
+# --- Hardcoded Zia SearchLabs credentials ---
+ORG_ID = "60077360247"
+API_CONFIG_KEY = "MjgyNjAwMDAwMDAwMjA5NQ=="
+
+
+def get_proxies():
+    """Use HTTPS_PROXY/https_proxy env var if set, else fall back to the
+    known local proxy (e.g. corporate security agent intercepting traffic)."""
+    https_proxy = os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy") or LOCAL_PROXY
+    http_proxy = os.environ.get("HTTP_PROXY") or os.environ.get("http_proxy") or LOCAL_PROXY
+    return {"http": http_proxy, "https": https_proxy}
 
 st.set_page_config(page_title="Zia Flow Docs Chatbot", page_icon="🤖", layout="wide")
 
@@ -44,7 +59,7 @@ def call_helpassistant(query, org_id, api_config_key, oauth_token=None, is_agent
     if oauth_token:
         headers["Authorization"] = f"Zoho-oauthtoken {oauth_token}"
 
-    resp = requests.get(url, params=params, headers=headers, timeout=timeout)
+    resp = requests.get(url, params=params, headers=headers, proxies=get_proxies(), timeout=timeout)
     resp.raise_for_status()
     try:
         return resp.json()
@@ -96,8 +111,8 @@ def render_answer(data):
 
 # ---------------- Sidebar: connection config ----------------
 st.sidebar.header("🔧 Zia SearchLabs config")
-org_id = st.sidebar.text_input("Org ID", help="Your Zoho org ID (path param in the URL)")
-api_config_key = st.sidebar.text_input("API config key", type="password")
+org_id = ORG_ID
+api_config_key = API_CONFIG_KEY
 oauth_token = st.sidebar.text_input(
     "OAuth token (optional)",
     type="password",
