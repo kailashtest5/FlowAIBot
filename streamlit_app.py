@@ -18,24 +18,13 @@ sources) and falls back to showing the raw JSON if none match. Once you
 share a sample response, I can tighten the rendering to match it exactly.
 """
 
-import os
 import json
 import requests
 import streamlit as st
 
-LOCAL_PROXY = "http://127.0.0.1:3128"
-
-# --- Hardcoded Zia SearchLabs credentials ---
-ORG_ID = "60077360247"
-API_CONFIG_KEY = "MjgyNjAwMDAwMDAwMjA5NQ=="
-
-
-def get_proxies():
-    """Use HTTPS_PROXY/https_proxy env var if set, else fall back to the
-    known local proxy (e.g. corporate security agent intercepting traffic)."""
-    https_proxy = os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy") or LOCAL_PROXY
-    http_proxy = os.environ.get("HTTP_PROXY") or os.environ.get("http_proxy") or LOCAL_PROXY
-    return {"http": http_proxy, "https": https_proxy}
+# --- Zia SearchLabs credentials (from Streamlit Cloud secrets) ---
+ORG_ID = st.secrets["org_id"]
+API_CONFIG_KEY = st.secrets["api_config_key"]
 
 st.set_page_config(page_title="Zia Flow Docs Chatbot", page_icon="🤖", layout="wide")
 
@@ -54,7 +43,7 @@ def call_helpassistant(query, org_id, api_config_key, is_agentic=True, timeout=3
         "Accept": "application/json",
     }
 
-    resp = requests.get(url, params=params, headers=headers, proxies=get_proxies(), timeout=timeout)
+    resp = requests.get(url, params=params, headers=headers, timeout=timeout)
     resp.raise_for_status()
     try:
         return resp.json()
