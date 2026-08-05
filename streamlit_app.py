@@ -30,7 +30,7 @@ API_CONFIG_KEY = st.secrets.get("api_config_key", "")
 
 st.set_page_config(page_title="Zia Flow Docs Chatbot", page_icon="🤖", layout="wide")
 
-BASE_URL = "https://searchlabs.zoho.in/restapi/sitesearch/beta/{org_id}/helpassistant"
+BASE_URL = "https://zoho-search-proxy.kailashtest6.workers.dev//restapi/sitesearch/beta/{org_id}/helpassistant"
 
 
 def get_requests_session():
